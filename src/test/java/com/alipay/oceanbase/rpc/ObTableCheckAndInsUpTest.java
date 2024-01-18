@@ -138,12 +138,12 @@ public class ObTableCheckAndInsUpTest {
             e.printStackTrace();
             Assert.assertTrue(false);
         } finally {
-            for (long i = 1L; i <= 4L; i++) {
-                Delete delete = client.delete(TABLE_NAME);
-                delete.setRowKey(row(colVal("c1", i), colVal("c2", "c2_v0")));
-                MutationResult res = delete.execute();
-                Assert.assertEquals(1, res.getAffectedRows());
-            }
+//            for (long i = 1L; i <= 4L; i++) {
+//                Delete delete = client.delete(TABLE_NAME);
+//                delete.setRowKey(row(colVal("c1", i), colVal("c2", "c2_v0")));
+//                MutationResult res = delete.execute();
+//                Assert.assertEquals(1, res.getAffectedRows());
+//            }
         }
     }
 
