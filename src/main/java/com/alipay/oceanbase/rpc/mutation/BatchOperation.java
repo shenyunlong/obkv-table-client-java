@@ -26,6 +26,7 @@ import com.alipay.oceanbase.rpc.table.ObTableClientLSBatchOpsImpl;
 import com.alipay.oceanbase.rpc.table.api.Table;
 import com.alipay.oceanbase.rpc.table.api.TableBatchOps;
 import com.alipay.oceanbase.rpc.table.api.TableQuery;
+import com.alipay.oceanbase.rpc.ObGlobal;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -115,7 +116,7 @@ public class BatchOperation {
 
     @SuppressWarnings("unchecked")
     public BatchOperationResult execute() throws Exception {
-        if (hasCheckAndInsUp) {
+        if (hasCheckAndInsUp || ObGlobal.isLsOpSupport()) {
             return executeWithLSBatchOp();
         } else {
             return executeWithNormalBatchOp();
