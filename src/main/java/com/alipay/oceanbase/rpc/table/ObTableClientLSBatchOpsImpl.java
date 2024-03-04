@@ -25,6 +25,7 @@ import com.alipay.oceanbase.rpc.location.model.partition.ObPair;
 import com.alipay.oceanbase.rpc.mutation.*;
 import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import com.alipay.oceanbase.rpc.protocol.payload.ResultCodes;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObRowKey;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.ObNewRange;
@@ -267,7 +268,7 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
      */
     public List<Object> execute() throws Exception {
         List<Object> results = new ArrayList(batchOperation.size());
-        for (ObTableSingleOpResult result : executeInternal().getResults()) {
+        for (ObTableSingleOpResult result : executeInternal()) {
             int errCode = result.getHeader().getErrno();
             if (errCode == ResultCodes.OB_SUCCESS.errorCode) {
                 results.add(result.getAffectedRows());
@@ -285,7 +286,7 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
      */
     public List<Object> executeWithResult() throws Exception {
         List<Object> results = new ArrayList<Object>(batchOperation.size());
-        for (ObTableSingleOpResult result : executeInternal().getResults()) {
+        for (ObTableSingleOpResult result : executeInternal()) {
             int errCode = result.getHeader().getErrno();
             if (errCode == ResultCodes.OB_SUCCESS.errorCode) {
                 results.add(new MutationResult(result));
@@ -322,11 +323,11 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
 
         for (int i = 0; i < operations.size(); i++) {
             ObTableSingleOp operation = operations.get(i);
-            ObRowKey rowKeyObject = operation.getScanRange().get(0).getStartKey();
-            int rowKeySize = rowKeyObject.getObjs().size();
+            List<ObObj> rowkeyObjs = operation.getRowkeyObjs();
+            int rowKeySize = rowkeyObjs.size();
             Object[] rowKey = new Object[rowKeySize];
             for (int j = 0; j < rowKeySize; j++) {
-                rowKey[j] = rowKeyObject.getObj(j).getValue();
+                rowKey[j] = rowkeyObjs.get(j).getValue();
             }
             ObPair<Long, ObTableParam>  tableObPair= obTableClient.getTable(tableName, rowKey,
                     false, false, obTableClient.getRoute(false));
@@ -380,6 +381,7 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
         long tableId = 0;
         long originPartId = 0;
         long operationTimeout = 0;
+        ObTable subObTable = null;
 
         boolean isFirstEntry = true;
         // list ( index list for tablet op 1, index list for tablet op 2, ...)
@@ -403,6 +405,7 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
                 tableId = tableParam.getTableId();
                 originPartId = tableParam.getPartId();
                 operationTimeout = tableParam.getObTable().getObTableOperationTimeout();
+                subObTable = tableParam.getObTable();
                 isFirstEntry = false;
             }
         }
@@ -422,7 +425,6 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
         long startExecute = System.currentTimeMillis();
         Set<String> failedServerList = null;
         ObServerRoute route = null;
-        ObTable subObTable = null;
 
         while (true) {
             obTableClient.checkStatus();
@@ -545,13 +547,13 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
                     ObTableSingleOpResult subObTableSingleOpResult = singleOpResults.get(j);
                     subObTableSingleOpResult.setExecuteHost(subObTable.getIp());
                     subObTableSingleOpResult.setExecutePort(subObTable.getPort());
-                    results[singleOperationsWithIndexList.get(i).getLeft()] = subObTableSingleOpResult;
+                    results[singleOperationsWithIndexList.get(j).getLeft()] = subObTableSingleOpResult;
                 }
             }
         }
         String endpoint = subObTable.getIp() + ":" + subObTable.getPort();
-        MonitorUtil.info(tableLsOp, subObTable.getDatabase(), tableName,
-                "BATCH-LsExecute-", endpoint, tableLsOp,
+        MonitorUtil.info(tableLsOpRequest, subObTable.getDatabase(), tableName,
+                "LS_BATCH-Execute-", endpoint, tableLsOp,
                 affectedRows, endExecute - startExecute,
                 obTableClient.getslowQueryMonitorThreshold());
     }
@@ -559,7 +561,7 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
     /*
      * Execute internal.
      */
-    public ObTableTabletOpResult executeInternal() throws Exception {
+    public ObTableSingleOpResult[] executeInternal() throws Exception {
 
         if (tableName == null || tableName.isEmpty()) {
             throw new IllegalArgumentException("table name is null");
@@ -637,17 +639,16 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
             }
         }
 
-        ObTableTabletOpResult batchOperationResult = new ObTableTabletOpResult();
-        for (ObTableSingleOpResult obTableOperationResult : obTableOperationResults) {
-            batchOperationResult.addResult(obTableOperationResult);
+        if (obTableOperationResults.length <= 0) {
+            throw new ObTableUnexpectedException("Ls batch execute returns zero single operation results");
         }
 
-        MonitorUtil.info(batchOperationResult, obTableClient.getDatabase(), tableName, "BATCH", "",
+        MonitorUtil.info(obTableOperationResults[0], obTableClient.getDatabase(), tableName, "LS_BATCH", "",
             obTableOperationResults.length, getTableTime - start, System.currentTimeMillis()
                                                                   - getTableTime,
             obTableClient.getslowQueryMonitorThreshold());
 
-        return batchOperationResult;
+        return obTableOperationResults;
     }
 
     /*
