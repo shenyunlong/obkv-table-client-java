@@ -17,9 +17,7 @@
 
 package com.alipay.oceanbase.rpc;
 
-import com.alipay.oceanbase.rpc.mutation.BatchOperation;
-import com.alipay.oceanbase.rpc.mutation.Delete;
-import com.alipay.oceanbase.rpc.mutation.InsertOrUpdate;
+import com.alipay.oceanbase.rpc.mutation.*;
 import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
 import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import com.alipay.oceanbase.rpc.mutation.result.OperationResult;
@@ -31,7 +29,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.testcontainers.shaded.com.google.common.util.concurrent.ExecutionError;
-import com.alipay.oceanbase.rpc.mutation.Row;
 
 import javax.management.Query;
 
@@ -96,7 +93,7 @@ public class ObTableLsBatchTest {
             e.printStackTrace();
             Assert.assertTrue(false);
         } finally {
-            for (int j = 1; j < rowCnt; j++) {
+            for (int j = 0; j < rowCnt; j++) {
                 Delete delete = client.delete(TABLE_NAME);
                 delete.setRowKey(row(colVal("c1", values[j][0]), colVal("c2", values[j][1])));
                 MutationResult res = delete.execute();
@@ -290,6 +287,326 @@ public class ObTableLsBatchTest {
             e.printStackTrace();
             Assert.assertTrue(false);
         } finally {}
+    }
+
+    @Test
+    public void testBatchInsert() throws Exception {
+        BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+        Object values[][] = {
+                {1L, "c2_val", "c3_val", 100L},
+                {400L, "c2_val", "c3_val", 100L},
+                {401L, "c2_val", "c3_val", 100L},
+                {1000L, "c2_val", "c3_val", 100L},
+                {1001L, "c2_val", "c3_val", 100L},
+                {1002L, "c2_val", "c3_val", 100L},};
+        int rowCnt = values.length;
+        try {
+            for (int i = 0; i < rowCnt; i++) {
+                Object[] curRow = values[i];
+                Insert insert = new Insert();
+                insert.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                insert.addMutateRow(row(colVal("c3", curRow[2]), colVal("c4", curRow[3])));
+                batchOperation.addOperation(insert);
+            }
+
+            BatchOperationResult batchOperationResult = batchOperation.execute();
+            Assert.assertEquals(rowCnt, batchOperationResult.size());
+            for (int j = 0; j < rowCnt; j++) {
+                Assert.assertEquals(1, batchOperationResult.get(j).getAffectedRows());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Assert.assertTrue(false);
+        } finally {
+            for (int j = 0; j < rowCnt; j++) {
+                Delete delete = client.delete(TABLE_NAME);
+                delete.setRowKey(row(colVal("c1", values[j][0]), colVal("c2", values[j][1])));
+                MutationResult res = delete.execute();
+                Assert.assertEquals(1, res.getAffectedRows());
+            }
+        }
+    }
+
+    @Test
+    public void testBatchAppend() throws Exception {
+        Object values[][] = {
+                {1L, "c2_val", "c3_val", 100L},
+                {400L, "c2_val", "c3_val", 100L},
+                {401L, "c2_val", "c3_val", 100L},
+                {1000L, "c2_val", "c3_val", 100L},
+                {1001L, "c2_val", "c3_val", 100L},
+                {1002L, "c2_val", "c3_val", 100L},};
+        int rowCnt = values.length;
+        try {
+            // insert
+            {
+                BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+                for (int i = 0; i < rowCnt; i++) {
+                    Object[] curRow = values[i];
+                    Insert insert = new Insert();
+                    insert.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                    insert.addMutateRow(row(colVal("c3", curRow[2]), colVal("c4", curRow[3])));
+                    batchOperation.addOperation(insert);
+                }
+
+                BatchOperationResult batchOperationResult = batchOperation.execute();
+                Assert.assertEquals(rowCnt, batchOperationResult.size());
+                for (int j = 0; j < rowCnt; j++) {
+                    Assert.assertEquals(1, batchOperationResult.get(j).getAffectedRows());
+                }
+            }
+            // append
+            {
+                BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+                for (int i = 0; i < rowCnt; i++) {
+                    Object[] curRow = values[i];
+                    Append append = new Append();
+                    append.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                    append.addMutateRow(row(colVal("c3", curRow[2])));
+                    batchOperation.addOperation(append);
+                }
+
+                BatchOperationResult batchOperationResult = batchOperation.execute();
+                Assert.assertEquals(rowCnt, batchOperationResult.size());
+                for (int j = 0; j < rowCnt; j++) {
+                    Assert.assertEquals(1, batchOperationResult.get(j).getAffectedRows());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Assert.assertTrue(false);
+        } finally {
+            for (int j = 0; j < rowCnt; j++) {
+                Delete delete = client.delete(TABLE_NAME);
+                delete.setRowKey(row(colVal("c1", values[j][0]), colVal("c2", values[j][1])));
+                MutationResult res = delete.execute();
+                Assert.assertEquals(1, res.getAffectedRows());
+            }
+        }
+    }
+
+    @Test
+    public void testBatchDel() throws Exception {
+        Object values[][] = {
+                {1L, "c2_val", "c3_val", 100L},
+                {400L, "c2_val", "c3_val", 100L},
+                {401L, "c2_val", "c3_val", 100L},
+                {1000L, "c2_val", "c3_val", 100L},
+                {1001L, "c2_val", "c3_val", 100L},
+                {1002L, "c2_val", "c3_val", 100L},};
+        int rowCnt = values.length;
+        try {
+            // insert
+            {
+                BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+                for (int i = 0; i < rowCnt; i++) {
+                    Object[] curRow = values[i];
+                    Insert insert = new Insert();
+                    insert.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                    insert.addMutateRow(row(colVal("c3", curRow[2]), colVal("c4", curRow[3])));
+                    batchOperation.addOperation(insert);
+                }
+
+                BatchOperationResult batchOperationResult = batchOperation.execute();
+                Assert.assertEquals(rowCnt, batchOperationResult.size());
+                for (int j = 0; j < rowCnt; j++) {
+                    Assert.assertEquals(1, batchOperationResult.get(j).getAffectedRows());
+                }
+            }
+            // del
+            {
+                BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+                for (int i = 0; i < rowCnt; i++) {
+                    Object[] curRow = values[i];
+                    Delete delete = new Delete();
+                    delete.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                    batchOperation.addOperation(delete);
+                }
+
+                BatchOperationResult batchOperationResult = batchOperation.execute();
+                Assert.assertEquals(rowCnt, batchOperationResult.size());
+                for (int j = 0; j < rowCnt; j++) {
+                    Assert.assertEquals(1, batchOperationResult.get(j).getAffectedRows());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Assert.assertTrue(false);
+        }
+    }
+
+    @Test
+    public void testBatchIncrement() throws Exception {
+        Object values[][] = {
+                {1L, "c2_val", "c3_val", 100L},
+                {400L, "c2_val", "c3_val", 100L},
+                {401L, "c2_val", "c3_val", 100L},
+                {1000L, "c2_val", "c3_val", 100L},
+                {1001L, "c2_val", "c3_val", 100L},
+                {1002L, "c2_val", "c3_val", 100L},};
+        int rowCnt = values.length;
+        try {
+            // insert
+            {
+                BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+                for (int i = 0; i < rowCnt; i++) {
+                    Object[] curRow = values[i];
+                    Insert insert = new Insert();
+                    insert.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                    insert.addMutateRow(row(colVal("c3", curRow[2]), colVal("c4", curRow[3])));
+                    batchOperation.addOperation(insert);
+                }
+
+                BatchOperationResult batchOperationResult = batchOperation.execute();
+                Assert.assertEquals(rowCnt, batchOperationResult.size());
+                for (int j = 0; j < rowCnt; j++) {
+                    Assert.assertEquals(1, batchOperationResult.get(j).getAffectedRows());
+                }
+            }
+            // increment
+            {
+                BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+                for (int i = 0; i < rowCnt; i++) {
+                    Object[] curRow = values[i];
+                    Increment inc = new Increment();
+                    inc.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                    inc.addMutateRow(row(colVal("c4", curRow[3])));
+                    batchOperation.addOperation(inc);
+                }
+
+                BatchOperationResult batchOperationResult = batchOperation.execute();
+                Assert.assertEquals(rowCnt, batchOperationResult.size());
+                for (int j = 0; j < rowCnt; j++) {
+                    Assert.assertEquals(1, batchOperationResult.get(j).getAffectedRows());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Assert.assertTrue(false);
+        } finally {
+            for (int j = 0; j < rowCnt; j++) {
+                Delete delete = client.delete(TABLE_NAME);
+                delete.setRowKey(row(colVal("c1", values[j][0]), colVal("c2", values[j][1])));
+                MutationResult res = delete.execute();
+                Assert.assertEquals(1, res.getAffectedRows());
+            }
+        }
+    }
+
+    @Test
+    public void testBatchReplace() throws Exception {
+        Object values[][] = {
+                {1L, "c2_val", "c3_val", 100L},
+                {400L, "c2_val", "c3_val", 100L},
+                {401L, "c2_val", "c3_val", 100L},
+                {1000L, "c2_val", "c3_val", 100L},
+                {1001L, "c2_val", "c3_val", 100L},
+                {1002L, "c2_val", "c3_val", 100L},};
+        int rowCnt = values.length;
+        try {
+            // insert
+            {
+                BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+                for (int i = 0; i < rowCnt; i++) {
+                    Object[] curRow = values[i];
+                    Insert insert = new Insert();
+                    insert.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                    insert.addMutateRow(row(colVal("c3", curRow[2]), colVal("c4", curRow[3])));
+                    batchOperation.addOperation(insert);
+                }
+
+                BatchOperationResult batchOperationResult = batchOperation.execute();
+                Assert.assertEquals(rowCnt, batchOperationResult.size());
+                for (int j = 0; j < rowCnt; j++) {
+                    Assert.assertEquals(1, batchOperationResult.get(j).getAffectedRows());
+                }
+            }
+            // replace
+            {
+                BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+                for (int i = 0; i < rowCnt; i++) {
+                    Object[] curRow = values[i];
+                    Replace replace = new Replace();
+                    replace.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                    replace.addMutateRow(row(colVal("c3", curRow[1]), colVal("c4", curRow[3])));
+                    batchOperation.addOperation(replace);
+                }
+
+                BatchOperationResult batchOperationResult = batchOperation.execute();
+                Assert.assertEquals(rowCnt, batchOperationResult.size());
+                for (int j = 0; j < rowCnt; j++) {
+                    Assert.assertEquals(2, batchOperationResult.get(j).getAffectedRows());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Assert.assertTrue(false);
+        } finally {
+            for (int j = 0; j < rowCnt; j++) {
+                Delete delete = client.delete(TABLE_NAME);
+                delete.setRowKey(row(colVal("c1", values[j][0]), colVal("c2", values[j][1])));
+                MutationResult res = delete.execute();
+                Assert.assertEquals(1, res.getAffectedRows());
+            }
+        }
+    }
+
+    @Test
+    public void testBatchUpdate() throws Exception {
+        Object values[][] = {
+                {1L, "c2_val", "c3_val", 100L},
+                {400L, "c2_val", "c3_val", 100L},
+                {401L, "c2_val", "c3_val", 100L},
+                {1000L, "c2_val", "c3_val", 100L},
+                {1001L, "c2_val", "c3_val", 100L},
+                {1002L, "c2_val", "c3_val", 100L},};
+        int rowCnt = values.length;
+        try {
+            // insert
+            {
+                BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+                for (int i = 0; i < rowCnt; i++) {
+                    Object[] curRow = values[i];
+                    Insert insert = new Insert();
+                    insert.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                    insert.addMutateRow(row(colVal("c3", curRow[2]), colVal("c4", curRow[3])));
+                    batchOperation.addOperation(insert);
+                }
+
+                BatchOperationResult batchOperationResult = batchOperation.execute();
+                Assert.assertEquals(rowCnt, batchOperationResult.size());
+                for (int j = 0; j < rowCnt; j++) {
+                    Assert.assertEquals(1, batchOperationResult.get(j).getAffectedRows());
+                }
+            }
+            // update
+            {
+                BatchOperation batchOperation = client.batchOperation(TABLE_NAME);
+                for (int i = 0; i < rowCnt; i++) {
+                    Object[] curRow = values[i];
+                    Update update = new Update();
+                    update.setRowKey(row(colVal("c1", curRow[0]), colVal("c2", curRow[1])));
+                    update.addMutateRow(row(colVal("c3", curRow[1]), colVal("c4", curRow[3])));
+                    batchOperation.addOperation(update);
+                }
+
+                BatchOperationResult batchOperationResult = batchOperation.execute();
+                Assert.assertEquals(rowCnt, batchOperationResult.size());
+                for (int j = 0; j < rowCnt; j++) {
+                    Assert.assertEquals(1, batchOperationResult.get(j).getAffectedRows());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Assert.assertTrue(false);
+        } finally {
+            for (int j = 0; j < rowCnt; j++) {
+                Delete delete = client.delete(TABLE_NAME);
+                delete.setRowKey(row(colVal("c1", values[j][0]), colVal("c2", values[j][1])));
+                MutationResult res = delete.execute();
+                Assert.assertEquals(1, res.getAffectedRows());
+            }
+        }
     }
 
 }
