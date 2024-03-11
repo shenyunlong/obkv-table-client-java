@@ -67,14 +67,18 @@ CREATE TABLE IF NOT EXISTS `test_varbinary_table` (
     );
 
 CREATE TABLE IF NOT EXISTS `test_timestamp_table` (
-     `c1` varchar(20) NOT NULL,
-     `c2` timestamp DEFAULT NULL,
+    `c1` varchar(20) NOT NULL,
+    `c2` timestamp(6) DEFAULT NULL,
+    `c3` timestamp(3) DEFAULT NULL,
+    `c4` timestamp DEFAULT NULL,
      PRIMARY KEY (`c1`)
     );
 
 CREATE TABLE IF NOT EXISTS `test_datetime_table` (
-     `c1` varchar(20) NOT NULL,
-     `c2` datetime DEFAULT NULL,
+    `c1` varchar(20) NOT NULL,
+    `c2` datetime(6) DEFAULT NULL,
+    `c3` datetime(3) DEFAULT NULL,
+    `c4` datetime DEFAULT NULL,
      PRIMARY KEY (`c1`)
     );
 
@@ -117,8 +121,8 @@ PRIMARY KEY (`c0`, `c1`, `c2`, `c3`, `c4`, `c5`)
 partition by key(`c0`, `c1`, `c2`, `c3`, `c4`) subpartition by key(`c5`) subpartitions 4 partitions 16;
 
 CREATE TABLE IF NOT EXISTS `testDateTime` (
-    `c0` DateTime(6) NOT NULL,
-    `c1` datetime(6) NOT NULL,
+    `c0` DateTime NOT NULL,
+    `c1` Datetime(6) NOT NULL,
     `c2` varchar(20) default NULL,
 PRIMARY KEY (`c0`, `c1`)
 ) DEFAULT CHARSET = utf8mb4 ROW_FORMAT = DYNAMIC COMPRESSION = 'lz4_1.0' REPLICA_NUM = 3 BLOCK_SIZE = 16384 USE_BLOOM_FILTER = FALSE TABLET_SIZE = 134217728 PCTFREE = 10
@@ -242,6 +246,16 @@ CREATE TABLE `test_mutation` (
           PARTITION p1 VALUES LESS THAN (1000),
           PARTITION p2 VALUES LESS THAN MAXVALUE);
 
+CREATE TABLE `test_mutation_column_reverse` (
+     `c2` bigint NOT NULL,
+     `c1` varchar(20) NOT NULL,
+     `c3` varbinary(1024) DEFAULT NULL,
+     `c4` bigint DEFAULT NULL,
+     PRIMARY KEY(`c2`, `c1`)) partition by range columns (`c2`) (
+PARTITION p0 VALUES LESS THAN (300),
+PARTITION p1 VALUES LESS THAN (1000),
+PARTITION p2 VALUES LESS THAN MAXVALUE);
+
 CREATE TABLE `test_throttle` (
     `c1` bigint NOT NULL,
     `c2` varchar(20) NOT NULL,
@@ -278,6 +292,13 @@ CREATE TABLE `test_ttl_timestamp` (
  `expired_ts` timestamp(6),
 PRIMARY KEY (`c1`)) TTL(expired_ts + INTERVAL 0 SECOND);
 
+CREATE TABLE `test_ttl_timestamp_5s` (
+    `c1` bigint NOT NULL,
+    `c2` varchar(20) DEFAULT NULL,
+    `c3` bigint DEFAULT NULL,
+    `expired_ts` timestamp(6),
+PRIMARY KEY (`c1`)) TTL(expired_ts + INTERVAL 5 SECOND);
+
 CREATE TABLE IF NOT EXISTS `test_auto_increment_rowkey` (
     `c1` int auto_increment,
     `c2` int NOT NULL,
@@ -305,48 +326,21 @@ CREATE TABLE IF NOT EXISTS `test_global_hash_range` (
         partition p0 values less than (100),
         partition p1 values less than (200),
         partition p2 values less than (300)),
-    KEY `idx2` (`C3`)  LOCAL) partition by hash(c1) (
-    partition p0,
-    partition p1,
-    partition p2,
-    partition p3,
-    partition p4);
+    KEY `idx2` (`C3`)  LOCAL) partition by hash(c1) partitions 5;
 
 CREATE TABLE IF NOT EXISTS `test_global_hash_hash` (
   `c1` int(11) NOT NULL,
   `c2` int(11) DEFAULT NULL,
   `c3` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`c1`),
-  KEY `idx` (`c2`) GLOBAL partition by hash(`c2`) (
-    partition p0,
-    partition p1,
-    partition p2,
-    partition p3,
-    partition p4)) partition by hash(`c1`) (
-        partition p0,
-        partition p1,
-        partition p2,
-        partition p3,
-        partition p4,
-        partition p6);
+  KEY `idx` (`c2`) GLOBAL partition by hash(`c2`) partitions 5) partition by hash(`c1`) partitions 7;;
 
 CREATE TABLE IF NOT EXISTS `test_global_key_key` (
   `c1` int(11) NOT NULL,
   `c2` int(11) DEFAULT NULL,
   `c3` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`c1`),
-  KEY `idx` (`c2`) GLOBAL partition by key(`c2`) (
-    partition p0,
-    partition p1,
-    partition p2,
-    partition p3,
-    partition p4)) partition by key(`c1`) (
-        partition p0,
-        partition p1,
-        partition p2,
-        partition p3,
-        partition p4,
-        partition p6);
+  KEY `idx` (`c2`) GLOBAL partition by key(`c2`) partitions 5) partition by key(`c1`) partitions 7;
 
 CREATE TABLE IF NOT EXISTS `test_global_range_range` (
     `c1` int(11) NOT NULL,
@@ -367,13 +361,7 @@ CREATE TABLE IF NOT EXISTS `test_global_index_no_part` (
   `C3` int(11) DEFAULT NULL,
   PRIMARY KEY (`c1`),
   KEY `idx` (`c2`) GLOBAL,
-  KEY `idx2` (c3) LOCAL) partition by hash(`c1`) (
-    partition p0,
-    partition p1,
-    partition p2,
-    partition p3,
-    partition p4,
-    partition p6);
+  KEY `idx2` (c3) LOCAL) partition by hash(`c1`) partitions 7;
 
 CREATE TABLE IF NOT EXISTS `test_global_all_no_part` (
   `C1` int(11) NOT NULL,
@@ -388,12 +376,7 @@ CREATE TABLE IF NOT EXISTS `test_global_primary_no_part` (
   `C2` int(11) DEFAULT NULL,
   `C3` int(11) DEFAULT NULL,
   PRIMARY KEY (`C1`),
-  KEY `idx` (`C2`) GLOBAL partition by hash(`C2`) (
-    partition p0,
-    partition p1,
-    partition p2,
-    partition p3,
-    partition p4),
+  KEY `idx` (`C2`) GLOBAL partition by hash(`C2`) partitions 5,
   KEY `idx2` (C3) LOCAL);
 
 CREATE TABLE IF NOT EXISTS `test_ttl_timestamp_with_index` (
@@ -406,7 +389,6 @@ PRIMARY KEY (`c1`, `c2`),
 KEY `idx`(`c1`, `c4`) local,
 KEY `idx2`(`c3`) global partition by hash(`c3`) partitions 4)
 TTL(expired_ts + INTERVAL 0 SECOND) partition by key(`c1`) partitions 4;
-
 
 CREATE TABLE IF NOT EXISTS  `error_message_table` (
     `c1` bigint(20) not null,
@@ -440,12 +422,51 @@ CREATE TABLE IF NOT EXISTS `sync_item` (
     DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci
     PARTITION BY KEY(`uid`) PARTITIONS 32;
 
+CREATE TABLE `hash_key_sub_part` (
+    `id` bigint(11) NOT NULL,
+    `uid` varchar(20) NOT NULL,
+    `object_id` varchar(32) NOT NULL,
+    `type` int(11) DEFAULT NULL,
+    `ver_oid` varchar(32) DEFAULT NULL,
+    `ver_ts` bigint(20) DEFAULT NULL,
+    `data_id` varchar(32) DEFAULT NULL,
+    PRIMARY KEY (`id`, `uid`, `object_id`)
+) DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci PARTITION BY HASH(`id`) SUBPARTITION BY KEY(`uid`) subpartitions 4 PARTITIONS 8;
+
+CREATE TABLE IF NOT EXISTS `test_table_object` (
+    `c1` tinyint primary key,
+    `c2` smallint not null,
+    `c3` int not null,
+    `c4` bigint not null,
+    `c5` varchar(128) not null,
+    `c6` varbinary(128) not null,
+    `c7` float not null,
+    `c8` double not null,
+    `c9` timestamp(6) not null,
+    `c10` datetime(6) not null,
+    `c11` int default null
+);
 CREATE TABLE IF NOT EXISTS `test_put` (
     `id` varchar(20) NOT NULL,
     `c1` bigint DEFAULT NULL,
     `c2` bigint DEFAULT NULL,
     `c3` varchar(32) DEFAULT NULL,
     `c4` bigint DEFAULT NULL,
-    PRIMARY KEY(`id`)) PARTITION BY KEY(`id`) PARTITIONS 32;
+    `expired_ts` timestamp(6) NOT NULL,
+    PRIMARY KEY(`id`)) TTL(expired_ts + INTERVAL 1 SECOND) PARTITION BY KEY(`id`) PARTITIONS 32;
+
+CREATE TABLE IF NOT EXISTS `test_put_with_local_index` (
+    `id` varchar(20) NOT NULL,
+    `c1` bigint DEFAULT NULL,
+    index idx1(`c1`) local,
+    `expired_ts` timestamp(6) NOT NULL,
+    PRIMARY KEY(`id`)) TTL(expired_ts + INTERVAL 1 SECOND) PARTITION BY KEY(`id`) PARTITIONS 32;
+
+CREATE TABLE IF NOT EXISTS `test_put_with_global_index` (
+    `id` varchar(20) NOT NULL,
+    `c1` bigint DEFAULT NULL,
+    index idx1(`c1`) global,
+    `expired_ts` timestamp(6) NOT NULL,
+    PRIMARY KEY(`id`)) TTL(expired_ts + INTERVAL 1 SECOND) PARTITION BY KEY(`id`) PARTITIONS 32;
 
 alter system set kv_hotkey_throttle_threshold = 50;

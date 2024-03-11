@@ -256,12 +256,6 @@ public class ObTableClientBatchOpsImpl extends AbstractTableBatchOps {
             obTableOperations.getRight().add(new ObPair<Integer, ObTableOperation>(i, operation));
         }
 
-        if (atomicOperation) {
-            if (partitionOperationsMap.size() > 1) {
-                throw new ObTablePartitionConsistentException(
-                    "require atomic operation but found across partition may cause consistent problem ");
-            }
-        }
         return partitionOperationsMap;
     }
 
@@ -458,6 +452,9 @@ public class ObTableClientBatchOpsImpl extends AbstractTableBatchOps {
      */
     public ObTableBatchOperationResult executeInternal() throws Exception {
 
+        if (tableName == null || tableName.isEmpty()) {
+            throw new IllegalArgumentException("table name is null");
+        }
         long start = System.currentTimeMillis();
         List<ObTableOperation> operations = batchOperation.getTableOperations();
         final ObTableOperationResult[] obTableOperationResults = new ObTableOperationResult[operations
